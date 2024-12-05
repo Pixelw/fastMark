@@ -1,17 +1,17 @@
+import math
 import os
 import argparse
 
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags, ImageDraw, ImageFont
 from PIL.ImageFile import ImageFile
 
 
 # ©Carl Su
 # shot on CAMERA_NAME with LENS_NAME, ISO, F, SPEED
 
-def get_exif(file: str, tags: str) -> str:
+def get_exif(photo: ImageFile, tag_arr: str) -> str:
     result = ""
-    img: ImageFile = Image.open(file)
-    exif = img.getexif()
+    exif = photo.getexif()
     if exif is None:
         print('Sorry, image has no exif data.')
         return ""
@@ -19,21 +19,21 @@ def get_exif(file: str, tags: str) -> str:
     ifd = exif.get_ifd(ExifTags.IFD.Exif)
 
     try:
-        if 'm' in tags:
+        if 'm' in tag_arr:
             model = exif[ExifTags.Base.Model].strip()
             result += f"Shot on {model}. "
     except:
         pass
 
     try:
-        if 'l' in tags:
+        if 'l' in tag_arr:
             lens = ifd[ExifTags.Base.LensModel].strip()
             result = result.replace(". ", " ")
             result += f"with {lens}. "
     except:
         pass
 
-    if 'f' in tags:
+    if 'f' in tag_arr:
         try:
             focal_len = float(ifd[ExifTags.Base.FocalLength])
             focal_len35 = float(ifd.get(ExifTags.Base.FocalLengthIn35mmFilm, 0))
@@ -45,7 +45,7 @@ def get_exif(file: str, tags: str) -> str:
         except:
             pass
 
-    if 'e' in tags:
+    if 'e' in tag_arr:
         try:
             aperture = float(ifd[ExifTags.Base.FNumber])
             if len(result) == 5:
@@ -114,6 +114,15 @@ def get_image_files():
     return image_files
 
 
+def draw_watermark(photo, exif_str):
+    draw = ImageDraw.Draw(photo)
+    fontStyle = ImageFont.truetype("fonts/Inter_24pt-Bold.ttf", 60, encoding="utf-8")
+    start = math.floor(photo.width * 0.05)
+    top = math.floor(photo.height * 0.95)
+    draw.text(xy=(start, top), text=exif_str, fill=(255, 255, 255), font=fontStyle)
+    photo.show()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A script that watermark all photos in this working dir.")
     parser.add_argument("-c", "--copyright", type=str, help="copyright information")
@@ -134,4 +143,8 @@ if __name__ == '__main__':
         tags += "m"
 
     for path in files:
-        get_exif(path, tags)
+        copyright_str = args.copyright
+        img = Image.open(path)
+        exif = get_exif(img, tags)
+        draw_watermark(img, exif)
+        img.close()
